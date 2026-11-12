@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Talking Cactus</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(#bcecf0,#e5f3c9);font-family:system-ui,sans-serif;color:#174b32}.app{text-align:center;width:min(94vw,430px);padding:20px}.stage{height:390px;position:relative;display:grid;place-items:center}.cactus{position:relative;width:150px;height:245px;background:linear-gradient(90deg,#16834a,#49b96b);border-radius:80px 80px 48px 48px;box-shadow:inset -12px 0 #137542;z-index:2;transition:transform .2s}.cactus:before,.cactus:after{content:"";position:absolute;width:48px;height:115px;background:#269b56;border-radius:35px;top:100px;z-index:-1}.cactus:before{left:-37px;transform:rotate(8deg)}.cactus:after{right:-37px;transform:rotate(-8deg)}.eyes{display:flex;justify-content:space-evenly;margin:70px auto 0;width:100px}.eye{width:23px;height:30px;border-radius:50%;background:white;position:relative}.eye:after{content:"";position:absolute;width:9px;height:13px;background:#183b29;border-radius:50%;left:7px;top:9px}.mouth{width:25px;height:12px;border-radius:50%;background:#153c29;margin:27px auto 0}.pot{position:absolute;bottom:18px;width:185px;height:95px;background:#b96740;clip-path:polygon(3% 0,97% 0,82% 100%,18% 100%);z-index:3}.rim{position:absolute;bottom:98px;width:195px;height:22px;border-radius:9px;background:#85462e;z-index:4}.flower{position:absolute;top:33px;font-size:38px;z-index:5}/* Dance + party lights activate only while the cactus repeats audio */
+.talking .mouth{animation:mouth .16s infinite alternate}
+.talking .cactus{animation:cactusDance .34s infinite alternate;box-shadow:0 0 18px #70ffab,0 0 42px #39e68a,inset -12px 0 #137542}
+.talking .cactus:before{animation:armLeft .34s infinite alternate}
+.talking .cactus:after{animation:armRight .34s infinite alternate}
+.talking .flower{animation:flowerDance .42s infinite alternate}
+.talking .pot{animation:potDance .34s infinite alternate;filter:drop-shadow(0 0 10px #ffd85b)}
+.stage:before{content:"";position:absolute;width:290px;height:290px;border-radius:50%;background:radial-gradient(circle,#fff5a8 0%,#9affc4 28%,transparent 70%);opacity:0;transform:scale(.7);pointer-events:none}
+.talking:before{opacity:.9;animation:glowPulse .65s infinite alternate}
+.light-show{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .15s;z-index:6}
+.talking .light-show{opacity:1}
+.light-show i{position:absolute;width:13px;height:13px;border-radius:50%;box-shadow:0 0 10px currentColor,0 0 22px currentColor;animation:lightBlink .42s infinite alternate}
+.light-show i:nth-child(1){left:8%;top:22%;color:#ff4f9a;background:currentColor}
+.light-show i:nth-child(2){right:8%;top:30%;color:#ffe45b;background:currentColor;animation-delay:.15s}
+.light-show i:nth-child(3){left:15%;top:65%;color:#55dcff;background:currentColor;animation-delay:.25s}
+.light-show i:nth-child(4){right:14%;top:70%;color:#ad72ff;background:currentColor;animation-delay:.1s}
+.light-show i:nth-child(5){left:28%;top:10%;color:#ff914d;background:currentColor;animation-delay:.3s}
+.light-show i:nth-child(6){right:27%;top:12%;color:#67ff8b;background:currentColor;animation-delay:.2s}
+@keyframes mouth{to{height:29px;width:30px}}
+@keyframes cactusDance{0%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-10px) rotate(7deg)}100%{transform:translateY(-2px) rotate(-5deg)}}
+@keyframes armLeft{to{transform:rotate(-28deg) translateY(-8px)}}
+@keyframes armRight{to{transform:rotate(28deg) translateY(-8px)}}
+@keyframes flowerDance{to{transform:rotate(24deg) scale(1.15)}}
+@keyframes potDance{to{transform:rotate(3deg)}}
+@keyframes glowPulse{to{transform:scale(1.12);filter:hue-rotate(35deg)}}
+@keyframes lightBlink{to{transform:scale(.35);opacity:.35}}
+@media(prefers-reduced-motion:reduce){.talking *{animation-duration:1.5s!important}}.bubble{background:white;border-radius:18px;padding:13px;margin:5px auto 0;max-width:330px;box-shadow:0 5px 16px #0001}.status{font-size:14px;margin:14px 0;color:#426b53}.start{border:0;border-radius:14px;padding:14px 22px;background:#177d49;color:white;font-weight:700;font-size:16px}.hint{font-size:12px;color:#557263;line-height:1.5;margin-top:13px}
+</style>
+</head>
+<body>
+<main class="app">
+<h1>🌵 Talking Cactus</h1>
+<div class="stage" id="stage">
+<div class="light-show" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<div class="flower">🌼</div>
+<div class="cactus"><div class="eyes"><span class="eye"></span><span class="eye"></span></div><div class="mouth"></div></div>
+<div class="rim"></div><div class="pot"></div>
+</div>
+<div class="bubble" id="bubble">Tap Start once, allow microphone, then talk to me!</div>
+<div class="status" id="status">Not listening yet</div>
+<button class="start" id="start">🎤 Start listening</button>
+<div class="hint">After starting, speak naturally. When you pause, the cactus plays back your recorded voice with a funny higher pitch. Audio stays in this browser tab and is not uploaded.</div>
+</main>
+<script>
+const startBtn=document.getElementById('start'), statusEl=document.getElementById('status'), stage=document.getElementById('stage'), bubble=document.getElementById('bubble');
+let stream,ctx,analyser,source,recorder,chunks=[],listening=false,playing=false,silenceSince=0,hasSpeech=false,raf=0;
+const SILENCE_MS=950, THRESHOLD=0.025;
+function status(s){statusEl.textContent=s}
+async function begin(){
+ if(listening)return;
+ try{
+  stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  ctx=new (window.AudioContext||window.webkitAudioContext)();
+  await ctx.resume();
+  analyser=ctx.createAnalyser();analyser.fftSize=1024;
+  source=ctx.createMediaStreamSource(stream);source.connect(analyser);
+  listening=true;startBtn.textContent='■ Stop listening';status('Listening — say something');
+  bubble.textContent='I am listening! 🌵';monitor();
+ }catch(e){status('Microphone error: '+(e.message||e));}
+}
+function monitor(){
+ if(!listening||playing)return;
+ const data=new Uint8Array(analyser.fftSize);analyser.getByteTimeDomainData(data);
+ let sum=0;for(const v of data){const x=(v-128)/128;sum+=x*x}
+ const rms=Math.sqrt(sum/data.length),now=performance.now();
+ if(rms>THRESHOLD){
+  if(!hasSpeech){hasSpeech=true;startRecording();status('Recording your voice…');bubble.textContent='Keep talking…';}
+  silenceSince=0;
+ }else if(hasSpeech){
+  if(!silenceSince)silenceSince=now;
+  if(now-silenceSince>SILENCE_MS){finishRecording();return;}
+ }
+ raf=requestAnimationFrame(monitor);
+}
+function startRecording(){
+ chunks=[];
+ try{recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};recorder.start();}
+ catch(e){status('Recording is not supported by this browser.');hasSpeech=false;}
+}
+function finishRecording(){
+ if(!recorder||recorder.state!=='recording'){hasSpeech=false;silenceSince=0;raf=requestAnimationFrame(monitor);return;}
+ playing=true;cancelAnimationFrame(raf);status('Cactus is repeating your voice…');bubble.textContent='Your turn…';
+ recorder.onstop=async()=>{
+  const blob=new Blob(chunks,{type:recorder.mimeType||'audio/webm'});
+  hasSpeech=false;silenceSince=0;
+  if(blob.size>500){
+   try{
+    const url=URL.createObjectURL(blob),audio=new Audio(url);audio.playbackRate=1.22;audio.preservesPitch=false;
+    stage.classList.add('talking');
+    audio.onended=()=>{stage.classList.remove('talking');URL.revokeObjectURL(url);playing=false;if(listening){status('Listening — say something');bubble.textContent='Go on, I am listening!';raf=requestAnimationFrame(monitor);}};
+    audio.onerror=()=>{stage.classList.remove('talking');URL.revokeObjectURL(url);playing=false;if(listening)raf=requestAnimationFrame(monitor);};
+    await audio.play();
+   }catch(e){stage.classList.remove('talking');playing=false;status('Playback failed: '+e.message);if(listening)raf=requestAnimationFrame(monitor);}
+  }else{playing=false;if(listening)raf=requestAnimationFrame(monitor);}
+ };
+ recorder.stop();
+}
+function stop(){
+ listening=false;playing=false;cancelAnimationFrame(raf);stage.classList.remove('talking');
+ if(recorder&&recorder.state==='recording')recorder.stop();
+ if(stream)stream.getTracks().forEach(t=>t.stop());
+ if(ctx)ctx.close();
+ startBtn.textContent='🎤 Start listening';status('Stopped');bubble.textContent='Tap Start to talk again!';
+}
+startBtn.addEventListener('click',()=>{if(listening)stop();else begin();});
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){status('Open this page on HTTPS or localhost to use the microphone.');startBtn.disabled=true;}
+</script>
+</body>
+</html>
